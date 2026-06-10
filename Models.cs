@@ -28,6 +28,7 @@ public record RequestResult
     public bool IsSuccess { get; init; }
     public string? ErrorMessage { get; init; }
     public DateTime Timestamp { get; init; }
+    public long WallClockMs { get; init; } 
 }
 
 public record EndpointStats
