@@ -7,6 +7,7 @@ namespace PerformanceTester.Engine;
 
 public class LoadEngine(IHttpClientFactory httpClientFactory)
 {
+    // ─── Test simple (concurrence fixe) ───────────────────────────────────────
     public async Task<BatchResult> RunAsync(
         EndpointConfig endpoint,
         TestConfig config,
@@ -14,10 +15,10 @@ public class LoadEngine(IHttpClientFactory httpClientFactory)
         CancellationToken ct = default)
     {
         var client = httpClientFactory.CreateClient("perf");
-    
+
         // Warmup — result discarded
         await RunBatchAsync(endpoint, config.WarmupRequests, 1, client, config.Timeout, null, ct);
-    
+
         return await RunBatchAsync(
             endpoint, config.TotalRequests, config.Concurrency,
             client, config.Timeout, progress, ct);
@@ -43,11 +44,12 @@ public class LoadEngine(IHttpClientFactory httpClientFactory)
             var concurrency = levels[i];
             onStageStart?.Invoke(i + 1, levels.Count, concurrency);
 
-            var results = await RunBatchAsync(
+            // ✅ FIX : utilise batch.Results et batch.WallClockSec
+            var batch = await RunBatchAsync(
                 endpoint, rampUp.RequestsPerStep, concurrency,
                 client, rampUp.Timeout, null, ct);
 
-            var stats = MetricsCollector.Compute(results, $"concurrency={concurrency}");
+            var stats = MetricsCollector.Compute(batch.Results, batch.WallClockSec, $"concurrency={concurrency}");
             stageResults.Add(new RampUpStageResult { Concurrency = concurrency, Stats = stats });
 
             if (i < levels.Count - 1 && rampUp.StepDelay > TimeSpan.Zero)
@@ -68,13 +70,13 @@ public class LoadEngine(IHttpClientFactory httpClientFactory)
         CancellationToken ct)
     {
         if (count <= 0) return new BatchResult { Results = [], WallClockSec = 0 };
-    
+
         var results = new ConcurrentBag<RequestResult>();
         var semaphore = new SemaphoreSlim(concurrency);
         int completed = 0;
-    
-        var wallClock = Stopwatch.StartNew();  // ← start before first request
-    
+
+        var wallClock = Stopwatch.StartNew();
+
         var tasks = Enumerable.Range(0, count).Select(async _ =>
         {
             await semaphore.WaitAsync(ct);
@@ -86,14 +88,14 @@ public class LoadEngine(IHttpClientFactory httpClientFactory)
             }
             finally { semaphore.Release(); }
         });
-    
+
         await Task.WhenAll(tasks);
-        wallClock.Stop();  // ← stop after last request
-    
+        wallClock.Stop();
+
         return new BatchResult
         {
             Results = [.. results],
-            WallClockSec = Math.Max(wallClock.Elapsed.TotalSeconds, 0.001) // never zero
+            WallClockSec = Math.Max(wallClock.Elapsed.TotalSeconds, 0.001)
         };
     }
 
