@@ -4,10 +4,13 @@ namespace PerformanceTester.Engine;
 
 public static class MetricsCollector
 {
-    public static EndpointStats Compute(List<RequestResult> results, string? nameOverride = null)
+    public static EndpointStats Compute(
+    List<RequestResult> results,
+    double wallClockSec,          // ← new parameter
+    string? nameOverride = null)
     {
         if (results.Count == 0) throw new ArgumentException("No results to compute.");
-
+    
         var name = nameOverride ?? results[0].EndpointName;
         var latencies = results
             .Where(r => r.IsSuccess)
@@ -15,23 +18,14 @@ public static class MetricsCollector
             .OrderBy(x => x)
             .ToArray();
     
-        var totalElapsedMs = results.Sum(r => r.ElapsedMs);
-        var durationSec = totalElapsedMs / 1000.0 / Math.Max(1, config.Concurrency); // wall-clock estimate
-        
-        // Simpler and more reliable: use actual timestamps with a floor
-        var minTs = results.Min(r => r.Timestamp);
-        var maxTs = results.Max(r => r.Timestamp);
-        var wallClockSec = results[0].WallClockMs / 1000.0;
-        
-        var rps = wallClockSec > 0
-            ? results.Count(r => r.IsSuccess) / wallClockSec
-            : results.Count(r => r.IsSuccess);  // fallback: all in <1ms, return count
-
+        var successCount = results.Count(r => r.IsSuccess);
+        var rps = wallClockSec > 0 ? successCount / wallClockSec : successCount;
+    
         return new EndpointStats
         {
             Name = name,
             TotalRequests = results.Count,
-            SuccessCount = results.Count(r => r.IsSuccess),
+            SuccessCount = successCount,
             ErrorCount = results.Count(r => !r.IsSuccess),
             MinMs = latencies.Length > 0 ? latencies[0] : 0,
             MaxMs = latencies.Length > 0 ? latencies[^1] : 0,
@@ -39,7 +33,7 @@ public static class MetricsCollector
             P50Ms = Percentile(latencies, 50),
             P95Ms = Percentile(latencies, 95),
             P99Ms = Percentile(latencies, 99),
-            RPS = rps,
+            RPS = Math.Round(rps, 1),          // ← never NaN
             TotalBytes = results.Sum(r => r.ResponseBytes),
             StatusCodes = results
                 .GroupBy(r => r.StatusCode)
