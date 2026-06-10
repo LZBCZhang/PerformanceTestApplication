@@ -7,7 +7,7 @@ namespace PerformanceTester.Engine;
 
 public class LoadEngine(IHttpClientFactory httpClientFactory)
 {
-    public async Task<List<RequestResult>> RunAsync(
+    public async Task<BatchResult> RunAsync(
         EndpointConfig endpoint,
         TestConfig config,
         IProgress<int>? progress = null,
@@ -15,20 +15,12 @@ public class LoadEngine(IHttpClientFactory httpClientFactory)
     {
         var client = httpClientFactory.CreateClient("perf");
     
-        // Warmup
+        // Warmup — result discarded
         await RunBatchAsync(endpoint, config.WarmupRequests, 1, client, config.Timeout, null, ct);
     
-        // ── Start measuring wall-clock BEFORE launching requests
-        var wallClock = Stopwatch.StartNew();
-    
-        var results = await RunBatchAsync(
+        return await RunBatchAsync(
             endpoint, config.TotalRequests, config.Concurrency,
             client, config.Timeout, progress, ct);
-    
-        wallClock.Stop();
-    
-        // ── Stamp the wall-clock duration on every result via a wrapper
-        return results.Select(r => r with { WallClockMs = wallClock.ElapsedMilliseconds }).ToList();
     }
 
     // ─── Mode ramp-up ─────────────────────────────────────────────────────────
