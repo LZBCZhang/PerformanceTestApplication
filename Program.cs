@@ -80,8 +80,8 @@ foreach (var ep in endpoints)
     Console.Write($"  {ep.Name} ...");
     var progress = new Progress<int>(n =>
         Console.Write($"\r  {ep.Name} : {n}/{total}   "));
-    var results = await engine.RunAsync(ep, testConfig, progress);
-    allStats.Add(MetricsCollector.Compute(results));
+    var batch = await engine.RunAsync(ep, testConfig, progress);
+    allStats.Add(MetricsCollector.Compute(batch.Results, batch.WallClockSec));
     Console.WriteLine(" ✓");
 }
 
