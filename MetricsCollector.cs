@@ -21,9 +21,11 @@ public static class MetricsCollector
         // Simpler and more reliable: use actual timestamps with a floor
         var minTs = results.Min(r => r.Timestamp);
         var maxTs = results.Max(r => r.Timestamp);
-        var wallClockSec = Math.Max((maxTs - minTs).TotalSeconds, 0.001); // never zero
-
-        var rps = results.Count(r => r.IsSuccess) / wallClockSec;
+        var wallClockSec = results[0].WallClockMs / 1000.0;
+        
+        var rps = wallClockSec > 0
+            ? results.Count(r => r.IsSuccess) / wallClockSec
+            : results.Count(r => r.IsSuccess);  // fallback: all in <1ms, return count
 
         return new EndpointStats
         {
