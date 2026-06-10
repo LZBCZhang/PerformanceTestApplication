@@ -14,10 +14,16 @@ public static class MetricsCollector
             .Select(r => (double)r.ElapsedMs)
             .OrderBy(x => x)
             .ToArray();
-
+    
+        var totalElapsedMs = results.Sum(r => r.ElapsedMs);
+        var durationSec = totalElapsedMs / 1000.0 / Math.Max(1, config.Concurrency); // wall-clock estimate
+        
+        // Simpler and more reliable: use actual timestamps with a floor
         var minTs = results.Min(r => r.Timestamp);
         var maxTs = results.Max(r => r.Timestamp);
-        var durationSec = (maxTs - minTs).TotalSeconds;
+        var wallClockSec = Math.Max((maxTs - minTs).TotalSeconds, 0.001); // never zero
+
+        var rps = results.Count(r => r.IsSuccess) / wallClockSec;
 
         return new EndpointStats
         {
@@ -31,7 +37,7 @@ public static class MetricsCollector
             P50Ms = Percentile(latencies, 50),
             P95Ms = Percentile(latencies, 95),
             P99Ms = Percentile(latencies, 99),
-            RPS = durationSec > 0 ? results.Count / durationSec : results.Count,
+            RPS = rps,
             TotalBytes = results.Sum(r => r.ResponseBytes),
             StatusCodes = results
                 .GroupBy(r => r.StatusCode)
