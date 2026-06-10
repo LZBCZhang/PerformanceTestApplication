@@ -66,7 +66,7 @@ public class LoadEngine(IHttpClientFactory httpClientFactory)
     }
 
     // ─── Noyau commun ─────────────────────────────────────────────────────────
-    private async Task<List<RequestResult>> RunBatchAsync(
+    private async Task<BatchResult> RunBatchAsync(
         EndpointConfig endpoint,
         int count,
         int concurrency,
@@ -75,12 +75,14 @@ public class LoadEngine(IHttpClientFactory httpClientFactory)
         IProgress<int>? progress,
         CancellationToken ct)
     {
-        if (count <= 0) return [];
-
+        if (count <= 0) return new BatchResult { Results = [], WallClockSec = 0 };
+    
         var results = new ConcurrentBag<RequestResult>();
         var semaphore = new SemaphoreSlim(concurrency);
         int completed = 0;
-
+    
+        var wallClock = Stopwatch.StartNew();  // ← start before first request
+    
         var tasks = Enumerable.Range(0, count).Select(async _ =>
         {
             await semaphore.WaitAsync(ct);
@@ -92,9 +94,15 @@ public class LoadEngine(IHttpClientFactory httpClientFactory)
             }
             finally { semaphore.Release(); }
         });
-
+    
         await Task.WhenAll(tasks);
-        return [.. results];
+        wallClock.Stop();  // ← stop after last request
+    
+        return new BatchResult
+        {
+            Results = [.. results],
+            WallClockSec = Math.Max(wallClock.Elapsed.TotalSeconds, 0.001) // never zero
+        };
     }
 
     private async Task<RequestResult> SendRequestAsync(
