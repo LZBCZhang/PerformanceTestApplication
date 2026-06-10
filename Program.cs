@@ -7,14 +7,12 @@ using PerformanceTester.Reports;
 // ─── Configuration ────────────────────────────────────────────────────────────
 var endpoints = new List<EndpointConfig>
 {
-    new() { Name = "GET /products",  Url = "https://uat.monapi.com/products",  Method = HttpMethod.Get },
-    new() { Name = "GET /users",     Url = "https://uat.monapi.com/users",     Method = HttpMethod.Get },
     new() {
-        Name = "POST /orders",
-        Url  = "https://uat.monapi.com/orders",
+        Name = "POST Get user consents",
+        Url  = "https://test.performance.net/api/serach/user",
         Method = HttpMethod.Post,
-        Body   = """{"productId": 1, "quantity": 2}""",
-        Headers = new() { ["Authorization"] = "Bearer <YOUR_TOKEN>" }
+        Body   = """{"userId": "9a4ce2af-cd8a-4a4b-84a5-9d9897d46952", "collectionPointId": "a492eec4-3fd0-4274-8891-0fc62a89cbed"}""",
+     //   Headers = new() { ["Authorization"] = "Bearer <YOUR_TOKEN>" }
     }
 };
 
